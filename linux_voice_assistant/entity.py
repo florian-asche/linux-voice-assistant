@@ -7,17 +7,17 @@ from aioesphomeapi.api_pb2 import (  # type: ignore[attr-defined]
     ListEntitiesMediaPlayerResponse,
     ListEntitiesRequest,
     ListEntitiesSwitchResponse,
-    SwitchCommandRequest,
-    SwitchStateResponse,
     MediaPlayerCommandRequest,
     MediaPlayerStateResponse,
     SubscribeHomeAssistantStatesRequest,
+    SwitchCommandRequest,
+    SwitchStateResponse,
 )
 from aioesphomeapi.model import (
+    EntityCategory,
     MediaPlayerCommand,
     MediaPlayerEntityFeature,
     MediaPlayerState,
-    EntityCategory,
 )
 from google.protobuf import message
 
@@ -34,6 +34,7 @@ SUPPORTED_MEDIA_PLAYER_FEATURES = (
     | MediaPlayerEntityFeature.VOLUME_MUTE
     | MediaPlayerEntityFeature.MEDIA_ANNOUNCE
 )
+
 
 class ESPHomeEntity:
     def __init__(self, server: APIServer) -> None:
@@ -137,7 +138,7 @@ class MediaPlayerEntity(ESPHomeEntity):
                         self.music_player.set_volume(int(self.volume * 100))
                         self.announce_player.set_volume(int(self.volume * 100))
                         self.muted = False
-                    yield self._update_state(self.state)                    
+                    yield self._update_state(self.state)
             elif msg.has_volume:
                 volume = int(msg.volume * 100)
                 self.music_player.set_volume(volume)
@@ -167,7 +168,9 @@ class MediaPlayerEntity(ESPHomeEntity):
             muted=self.muted,
         )
 
+
 # -----------------------------------------------------------------------------
+
 
 class MuteSwitchEntity(ESPHomeEntity):
     def __init__(
@@ -186,12 +189,14 @@ class MuteSwitchEntity(ESPHomeEntity):
         self.object_id = object_id
         self._get_muted = get_muted
         self._set_muted = set_muted
-        self._switch_state = self._get_muted()  # Sync internal state with actual muted value on init
+        self._switch_state = (
+            self._get_muted()
+        )  # Sync internal state with actual muted value on init
 
     def update_set_muted(self, set_muted: Callable[[bool], None]) -> None:
         # Update the callback used to change the mute state.
         self._set_muted = set_muted
-    
+
     def update_get_muted(self, get_muted: Callable[[], bool]) -> None:
         # Update the callback used to read the mute state.
         self._get_muted = get_muted
@@ -220,7 +225,8 @@ class MuteSwitchEntity(ESPHomeEntity):
             # Always return our internal switch state
             self.sync_with_state()
             yield SwitchStateResponse(key=self.key, state=self._switch_state)
-            
+
+
 class ThinkingSoundEntity(ESPHomeEntity):
     def __init__(
         self,
@@ -239,12 +245,16 @@ class ThinkingSoundEntity(ESPHomeEntity):
         self._get_thinking_sound_enabled = get_thinking_sound_enabled
         self._set_thinking_sound_enabled = set_thinking_sound_enabled
         self._switch_state = self._get_thinking_sound_enabled()  # Sync internal state
-        
-    def update_get_thinking_sound_enabled(self, get_thinking_sound_enabled: Callable[[], bool]) -> None:
+
+    def update_get_thinking_sound_enabled(
+        self, get_thinking_sound_enabled: Callable[[], bool]
+    ) -> None:
         # Update the callback used to read the thinking sound enabled state.
         self._get_thinking_sound_enabled = get_thinking_sound_enabled
 
-    def update_set_thinking_sound_enabled(self, set_thinking_sound_enabled: Callable[[bool], None]) -> None:
+    def update_set_thinking_sound_enabled(
+        self, set_thinking_sound_enabled: Callable[[bool], None]
+    ) -> None:
         # Update the callback used to change the thinking sound enabled state.
         self._set_thinking_sound_enabled = set_thinking_sound_enabled
 
@@ -271,4 +281,4 @@ class ThinkingSoundEntity(ESPHomeEntity):
         elif isinstance(msg, SubscribeHomeAssistantStatesRequest):
             # Always return our internal switch state
             self.sync_with_state()
-            yield SwitchStateResponse(key=self.key, state=self._switch_state)       
+            yield SwitchStateResponse(key=self.key, state=self._switch_state)
