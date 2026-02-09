@@ -1,4 +1,5 @@
 # mpv_player.py
+import logging
 from typing import Union, List, Callable, Optional
 
 from .player.libmpv import LibMpvPlayer
@@ -13,8 +14,11 @@ class MpvMediaPlayer:
     """
 
     def __init__(self, device: str | None = None) -> None:
+        self._log = logging.getLogger(self.__class__.__name__)
         self._player = LibMpvPlayer(device=device)
         self._done_callback: Optional[Callable[[], None]] = None
+
+        self._log.debug("MpvMediaPlayer initialized (device=%s)", device)
 
     def play(
         self,
@@ -28,29 +32,46 @@ class MpvMediaPlayer:
         Args:
             url: Media URL or list of URLs (LVA currently uses a single URL).
             done_callback: Optional callback invoked when playback finishes.
-            stop_first: Kept for API compatibility; currently unused.
+            stop_first: Kept for API compatibility.
         """
         # LVA currently only uses single URLs
         if isinstance(url, list):
+            self._log.debug("Received URL list, using first entry")
             url = url[0]
+
+        self._log.info("Playing media: %s", url)
+        self._log.debug(
+            "play(url=%s, stop_first=%s, done_callback=%s)",
+            url,
+            stop_first,
+            bool(done_callback),
+        )
 
         self._done_callback = done_callback
         self._player.play(url, done_callback=done_callback, stop_first=stop_first)
 
     def pause(self) -> None:
         """Pause playback."""
+        self._log.debug("pause() called")
         self._player.pause()
 
     def resume(self) -> None:
         """Resume playback."""
+        self._log.debug("resume() called")
         self._player.resume()
 
     def stop(self) -> None:
         """Stop playback and invoke the done callback if present."""
+        self._log.debug("stop() called")
+
         self._player.stop()
+
         if self._done_callback:
-            self._done_callback()
-            self._done_callback = None
+            self._log.debug("Invoking done_callback due to stop()")
+            try:
+                self._done_callback()
+            finally:
+                self._done_callback = None
 
     def set_volume(self, volume: float) -> None:
         """
@@ -59,6 +80,7 @@ class MpvMediaPlayer:
         Args:
             volume: Volume in percent (0.0–100.0).
         """
+        self._log.debug("set_volume(volume=%.2f)", volume)
         self._player.set_volume(volume)
 
     def duck(self, factor: float = 0.5) -> None:
@@ -68,8 +90,10 @@ class MpvMediaPlayer:
         Args:
             factor: Volume multiplier (0.0–1.0).
         """
+        self._log.debug("duck(factor=%.2f)", factor)
         self._player.duck(factor)
 
     def unduck(self) -> None:
         """Restore volume after ducking."""
+        self._log.debug("unduck() called")
         self._player.unduck()
