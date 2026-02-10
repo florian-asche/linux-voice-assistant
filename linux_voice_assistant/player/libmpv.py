@@ -25,8 +25,6 @@ class LibMpvPlayer(AudioPlayer):
         self._user_volume: float = 100.0   # 0.0 – 100.0
         self._duck_factor: float = 1.0     # 0.0 – 1.0
 
-        self._done_callback: Optional[Callable[[], None]] = None
-
         # mpv setup
         self._mpv = mpv.MPV(
             audio_display=False,
@@ -37,6 +35,9 @@ class LibMpvPlayer(AudioPlayer):
         if device:
             self._mpv["audio-device"] = device
 
+        # Callback Handling
+        self._done_callback: Optional[Callable[[], None]] = None
+        self._suppress_end_event = False
         self._mpv.event_callback("end-file")(self._on_end_file)
 
     # -------- Playback control --------
@@ -55,11 +56,10 @@ class LibMpvPlayer(AudioPlayer):
             done_callback: Optional callback invoked when playback finishes.
             stop_first: If True, start playback in paused state.
         """
-        with self._state_lock:
-            self._set_state(PlayerState.LOADING)
-
         self._done_callback = done_callback
         self._mpv.pause = stop_first
+        with self._state_lock:
+            self._set_state(PlayerState.LOADING)
         self._mpv.play(url)
 
     def pause(self) -> None:
@@ -74,11 +74,18 @@ class LibMpvPlayer(AudioPlayer):
             self._mpv.pause = False
             self._set_state(PlayerState.PLAYING)
 
-    def stop(self) -> None:
-        """Stop playback and reset state to IDLE."""
+    def stop(self, for_replacement: bool = False) -> None:
+        """
+        Stop playback.
+
+        If called for track replacement, suppresses end-of-playback handling
+        (state transition to IDLE and done callback) to allow seamless
+        playback transitions.
+        """
         with self._state_lock:
+            if for_replacement:
+                self._suppress_end_event = True
             self._mpv.stop()
-            self._set_state(PlayerState.IDLE)
 
     def state(self) -> PlayerState:
         """Return the current player state."""
@@ -126,6 +133,10 @@ class LibMpvPlayer(AudioPlayer):
         callback: Optional[Callable[[], None]] = None
 
         with self._state_lock:
+            if self._suppress_end_event:
+                self._suppress_end_event = False
+                return
+
             self._set_state(PlayerState.IDLE)
             callback = self._done_callback
             self._done_callback = None

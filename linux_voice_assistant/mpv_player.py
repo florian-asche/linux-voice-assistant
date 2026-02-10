@@ -39,6 +39,15 @@ class MpvMediaPlayer:
             self._log.debug("Received URL list, using first entry")
             url = url[0]
 
+        # Track is changing
+        if self._done_callback is not None:
+            self._log.debug(
+                "Stopping active playback before starting new media"
+            )
+            # Not self.stop() → this would call done_callback
+            self._player.stop(for_replacement=True)
+            self._done_callback = None
+
         self._log.info("Playing media: %s", url)
         self._log.debug(
             "play(url=%s, stop_first=%s, done_callback=%s)",
